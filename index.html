@@ -8,6 +8,11 @@
   </head>
   <body>
     <div id="root"></div>
+
+    <!-- ✅ Load Pyodide FIRST -->
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js"></script>
+
+    <!-- ✅ Then load React -->
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
