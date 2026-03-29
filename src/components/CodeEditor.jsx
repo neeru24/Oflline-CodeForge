@@ -7,13 +7,16 @@ import Output from "./Output";
 
 const CodeEditor = () => {
   const editorRef = useRef();
+  const outputRef = useRef();
+  const intervalRef = useRef(null);
 
   const [language, setLanguage] = useState("javascript");
   const [value, setValue] = useState("");
   const [fileName, setFileName] = useState("");
   const [savedFiles, setSavedFiles] = useState([]);
+  const [speed, setSpeed] = useState(1);
 
-  // 🔥 Load saved files list
+  // 🔥 Load saved files
   useEffect(() => {
     const files = JSON.parse(localStorage.getItem("saved-files")) || [];
     setSavedFiles(files);
@@ -22,11 +25,7 @@ const CodeEditor = () => {
   // 🔥 Load code on language change
   useEffect(() => {
     const savedCode = localStorage.getItem(`code-${language}`);
-    if (savedCode) {
-      setValue(savedCode);
-    } else {
-      setValue(CODE_SNIPPETS[language]);
-    }
+    setValue(savedCode || CODE_SNIPPETS[language]);
   }, [language]);
 
   const onMount = (editor) => {
@@ -34,90 +33,106 @@ const CodeEditor = () => {
     editor.focus();
   };
 
-  const onSelect = (lang) => {
-    setLanguage(lang);
-  };
+  const onSelect = (lang) => setLanguage(lang);
 
   const handleChange = (val) => {
     setValue(val);
     localStorage.setItem(`code-${language}`, val);
   };
 
-  // 🔥 SAVE FILE WITH NAME
+  // 💾 SAVE FILE
   const saveFile = () => {
-    if (!fileName.trim()) {
-      alert("Enter file name");
-      return;
-    }
+    if (!fileName.trim()) return;
 
-    const newFile = {
-      name: fileName,
-      language,
-      code: value,
-    };
+    const newFile = { name: fileName, language, code: value };
+    const updated = [...savedFiles, newFile];
 
-    const updatedFiles = [...savedFiles, newFile];
-
-    localStorage.setItem("saved-files", JSON.stringify(updatedFiles));
-    setSavedFiles(updatedFiles);
+    localStorage.setItem("saved-files", JSON.stringify(updated));
+    setSavedFiles(updated);
     setFileName("");
-
-    console.log("File saved:", fileName);
   };
 
-  // 🔥 LOAD FILE
+  // 📂 LOAD FILE
   const loadFile = (file) => {
     setLanguage(file.language);
     setValue(file.code);
   };
 
-  // 🔥 DELETE FILE
+  // ❌ DELETE FILE
   const deleteFile = (index) => {
-    const updatedFiles = savedFiles.filter((_, i) => i !== index);
-    localStorage.setItem("saved-files", JSON.stringify(updatedFiles));
-    setSavedFiles(updatedFiles);
+    const updated = savedFiles.filter((_, i) => i !== index);
+    localStorage.setItem("saved-files", JSON.stringify(updated));
+    setSavedFiles(updated);
   };
 
+  // 🔁 REPLAY (FIXED)
+  const replayCode = () => {
+    const code = editorRef.current.getValue();
+    let i = 0;
+
+    clearInterval(intervalRef.current);
+    setValue("");
+
+    intervalRef.current = setInterval(() => {
+      setValue((prev) => prev + (code[i] || ""));
+      i++;
+
+      if (i >= code.length) {
+        clearInterval(intervalRef.current);
+      }
+    }, 50 / speed);
+  };
+
+  // 📂 UPLOAD FILE
   const uploadFile = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
-    console.log("Selected:", file.name);
 
     const reader = new FileReader();
 
     reader.onload = (event) => {
       const content = event.target.result;
-
       const name = file.name.toLowerCase();
 
-      // 🔥 Language detection
-      if (name.endsWith(".py")) {
-        setLanguage("python");
-      } else if (name.endsWith(".js")) {
-        setLanguage("javascript");
-      } else {
-        alert("⚠️ Unknown file type, loading as text");
-      }
+      if (name.endsWith(".py")) setLanguage("python");
+      else if (name.endsWith(".js")) setLanguage("javascript");
 
-      // 🔥 Load into editor
       setValue(content);
-
-      // 🔥 Optional: show filename in input
       setFileName(file.name);
-
-      console.log("File loaded successfully");
-
-      // 🔥 VERY IMPORTANT FIX
       e.target.value = null;
     };
 
     reader.readAsText(file);
   };
+
+  // 🔥 EXPORT (clean)
+  const exportFile = () => {
+    const code = editorRef.current.getValue();
+
+    const data = {
+      language,
+      code,
+      timestamp: new Date().toISOString(),
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
+
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "code-export.json";
+    a.click();
+
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <HStack spacing={4} h="100%" align="stretch">
-      
-      {/* LEFT SIDE */}
+
+      {/* LEFT */}
       <Box
         flex="2"
         display="flex"
@@ -129,7 +144,55 @@ const CodeEditor = () => {
       >
         <LanguageSelector language={language} onSelect={onSelect} />
 
-        {/* SAVE SECTION */}
+        {/* 🔥 TOOLBAR */}
+        <HStack
+          mb={3}
+          spacing={3}
+          p={2}
+          border="1px solid #00ffcc"
+          borderRadius="8px"
+          boxShadow="0 0 15px #00ffcc"
+          bg="rgba(0,0,0,0.3)"
+        >
+          <Button size="sm" colorScheme="teal" onClick={exportFile}>
+            ⬇ Export
+          </Button>
+
+          <Button size="sm" colorScheme="yellow" onClick={replayCode}>
+            🔁 Replay
+          </Button>
+
+          <Button
+            size="sm"
+            colorScheme="orange"
+            onClick={() => clearInterval(intervalRef.current)}
+          >
+            ⏸ Pause
+          </Button>
+
+          <Button size="sm" colorScheme="green" onClick={replayCode}>
+            ▶ Resume
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setSpeed((prev) => (prev === 1 ? 2 : 1))}
+          >
+            ⚡ {speed}x
+          </Button>
+
+          <Button
+            size="sm"
+            bg="#00ffcc"
+            color="black"
+            onClick={() => outputRef.current.runCode()}
+          >
+            ▶ Run
+          </Button>
+        </HStack>
+
+        {/* SAVE + UPLOAD */}
         <HStack mb={2}>
           <Input
             placeholder="Enter file name"
@@ -142,18 +205,15 @@ const CodeEditor = () => {
             Save
           </Button>
 
-          {/* ✅ Upload Button */}
           <Button
             size="sm"
             bg="#00ffcc"
             color="black"
-            _hover={{ bg: "#00e6b8" }}
             onClick={() => document.getElementById("fileInput").click()}
           >
             {fileName ? `🔄 ${fileName}` : "📂 Upload"}
           </Button>
 
-          {/* ✅ Hidden Input */}
           <input
             id="fileInput"
             type="file"
@@ -163,6 +223,7 @@ const CodeEditor = () => {
           />
         </HStack>
 
+        {/* EDITOR */}
         <Box flex="1">
           <Editor
             height="100%"
@@ -176,10 +237,10 @@ const CodeEditor = () => {
         </Box>
       </Box>
 
-      {/* RIGHT SIDE */}
+      {/* RIGHT */}
       <Box flex="1" display="flex" flexDirection="column" gap={4}>
 
-        {/* 📂 SAVED FILES LIST */}
+        {/* SAVED FILES */}
         <Box
           p={3}
           border="1px solid #00ffcc"
@@ -193,35 +254,15 @@ const CodeEditor = () => {
           </Text>
 
           <VStack align="stretch" spacing={1}>
-            {savedFiles.length === 0 && (
-              <Text fontSize="sm">No files saved</Text>
-            )}
+            {savedFiles.length === 0 && <Text>No files saved</Text>}
 
             {savedFiles.map((file, index) => (
-              <HStack
-                key={index}
-                justify="space-between"
-                px={2}
-                py={1}
-                borderRadius="4px"
-                _hover={{ bg: "#1a1a1a" }}
-              >
-                <Text
-                  cursor="pointer"
-                  px={2}
-                  py={1}
-                  borderRadius="4px"
-                  _hover={{ bg: "#1a1a1a", color: "#00ffcc" }}
-                  onClick={() => loadFile(file)}
-                >
+              <HStack key={index} justify="space-between">
+                <Text cursor="pointer" onClick={() => loadFile(file)}>
                   {file.name} ({file.language})
                 </Text>
 
-                <Button
-                  size="xs"
-                  colorScheme="red"
-                  onClick={() => deleteFile(index)}
-                >
+                <Button size="xs" colorScheme="red" onClick={() => deleteFile(index)}>
                   X
                 </Button>
               </HStack>
@@ -230,7 +271,7 @@ const CodeEditor = () => {
         </Box>
 
         {/* OUTPUT */}
-        <Output editorRef={editorRef} language={language} />
+        <Output ref={outputRef} editorRef={editorRef} language={language} />
       </Box>
 
     </HStack>

@@ -2,34 +2,36 @@
 // 🔥 JavaScript Execution (Offline + Input)
 // ==========================================
 export const runJavaScript = (code, input = "") => {
+  let output = [];
+
   try {
-    let output = [];
+    let inputs = input.split("\n");
+    let inputIndex = 0;
 
     const originalLog = console.log;
-    const originalPrompt = window.prompt;
 
-    // 🔥 Capture console.log
+    // 🔥 capture console.log
     console.log = (...args) => {
       output.push(args.join(" "));
     };
 
-    // 🔥 Convert input lines into array
-    const inputs = input.split("\n");
-    let index = 0;
+    // 🔥 fake prompt
+    const prompt = (msg = "") => {
+      const value = inputs[inputIndex++] || "";
 
-    // 🔥 Override prompt()
-    window.prompt = () => {
-      return inputs[index++] || "";
+      if (msg) output.push(`> ${msg}`);
+      output.push(`> ${value}`);
+
+      return value;
     };
 
-    // Execute code
-    new Function(code)();
+    // execute code
+    new Function("prompt", code)(prompt);
 
-    // Restore originals
+    // restore console
     console.log = originalLog;
-    window.prompt = originalPrompt;
 
-    return output.length > 0
+    return output.length
       ? output.join("\n")
       : "✅ Code executed successfully!";
   } catch (error) {
@@ -61,27 +63,32 @@ export const runPython = async (code, input = "") => {
   try {
     const py = await loadPyodideInstance();
 
-    // Setup input + output capture
+    // 🔥 escape input safely
+    const safeInput = input.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+
     py.runPython(`
 import sys
 from io import StringIO
 
-_input_data = """${input}""".split("\\n")
-_input_index = 0
+input_data = """${safeInput}""".split("\\n")
+input_index = 0
 
-def input():
-    global _input_index
-    val = _input_data[_input_index]
-    _input_index += 1
-    return val
+def input(prompt=""):
+    global input_index
+    if input_index < len(input_data):
+        value = input_data[input_index]
+        input_index += 1
+        if prompt:
+            print("> " + prompt)
+        print("> " + value)
+        return value
+    return ""
 
 sys.stdout = StringIO()
     `);
 
-    // Run user code
     py.runPython(code);
 
-    // Get output
     let output = py.runPython("sys.stdout.getvalue()");
 
     return output || "✅ Code executed successfully!";

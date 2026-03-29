@@ -1,50 +1,90 @@
-import { useState } from "react";
-import { Box, Button, Text, Textarea } from "@chakra-ui/react";
+import { Box, Button, Text } from "@chakra-ui/react";
 import { runJavaScript, runPython } from "../api";
+import { useState, useImperativeHandle, forwardRef } from "react";
 
-const Output = ({ editorRef, language }) => {
-  const [output, setOutput] = useState("");
-  const [input, setInput] = useState("");
-  const [isError, setIsError] = useState(false);
+const Output = forwardRef(({ editorRef, language }, ref) => {
   const [isLoading, setIsLoading] = useState(false);
 
+  // 🔥 TERMINAL STATES
+  const [terminal, setTerminal] = useState([]);
+  const [currentInput, setCurrentInput] = useState("");
+  const [waitingForInput, setWaitingForInput] = useState(false);
+  const [inputs, setInputs] = useState([]);
+
+  // 🚀 RUN CODE
   const runCode = async () => {
     const sourceCode = editorRef.current.getValue();
     if (!sourceCode) return;
 
+    setTerminal([]);
+    setInputs([]);
+    setCurrentInput("");
+
+    // 🔍 detect if input needed
+    if (sourceCode.includes("prompt") || sourceCode.includes("input")) {
+      setWaitingForInput(true);
+      setTerminal(["> Program started..."]);
+      return;
+    }
+
+    executeCode(sourceCode, []);
+  };
+
+  useImperativeHandle(ref, () => ({
+    runCode,
+  }));
+
+  // ⚙️ EXECUTE CODE
+  const executeCode = async (code, inputsArr) => {
     try {
       setIsLoading(true);
 
       let result;
 
       if (language === "javascript") {
-        result = runJavaScript(sourceCode, input);
+        result = runJavaScript(code, inputsArr.join("\n"));
       } else if (language === "python") {
-        result = await runPython(sourceCode, input);
-      } else {
-        result = "⚠️ Language not supported";
+        result = await runPython(code, inputsArr.join("\n"));
       }
 
-      setIsError(result.startsWith("❌"));
-      setOutput(result);
+      // 🔥 API already formats prompts → just print
+      setTerminal((prev) => [...prev, ...result.split("\n")]);
     } catch (error) {
-      setIsError(true);
-      setOutput("❌ Error: " + error.message);
+      setTerminal((prev) => [...prev, "❌ " + error.message]);
     } finally {
       setIsLoading(false);
+      setWaitingForInput(false);
     }
   };
 
+  // ⌨️ HANDLE INPUT
+  const handleTerminalInput = (e) => {
+    if (e.key === "Enter") {
+      const value = currentInput;
+      const code = editorRef.current.getValue();
+
+      const expectedInputs =
+        (code.match(/prompt/g) || []).length +
+        (code.match(/input/g) || []).length;
+
+      const updatedInputs = [...inputs, value];
+
+      setCurrentInput("");
+      setInputs(updatedInputs);
+
+      if (updatedInputs.length < expectedInputs) return;
+
+      executeCode(code, updatedInputs);
+    }
+  };
+
+  // 💾 DOWNLOAD CODE
   const downloadCode = () => {
     const code = editorRef.current.getValue();
 
-    if (!code) {
-      alert("No code to download!");
-      return;
-    }
+    if (!code) return;
 
     let extension = "txt";
-
     if (language === "javascript") extension = "js";
     else if (language === "python") extension = "py";
 
@@ -59,83 +99,34 @@ const Output = ({ editorRef, language }) => {
     URL.revokeObjectURL(url);
   };
 
-  const uploadFile = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-
-    reader.onload = (e) => {
-      const content = e.target.result;
-
-      // 🔥 Detect language from extension
-      if (file.name.endsWith(".py")) {
-        setLanguage("python");
-      } else if (file.name.endsWith(".js")) {
-        setLanguage("javascript");
-      }
-
-      setValue(content);
-    };
-
-    reader.readAsText(file);
-  };
-
   return (
     <Box flex="1" display="flex" flexDirection="column" p={2} gap={2}>
-      
       {/* TITLE */}
       <Text fontSize="lg">Output</Text>
 
-      {/* 🔹 SMALL INPUT BOX */}
-      <Textarea
-        placeholder="Input (one per line)"
-        size="sm"
-        rows={2}                 // ✅ FIX SIZE
-        bg="black"
-        color="white"
-        border="1px solid #00ffcc"
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-      />
-
-      {/* 🔹 BUTTON ROW */}
+      {/* BUTTONS */}
       <Box display="flex" gap={2}>
-        <Button
-          bg="#00ffcc"
-          color="black"
-          _hover={{ bg: "#00e6b8" }}
-          onClick={runCode}
-          isLoading={isLoading}
-        >
-          Run Code
-        </Button>
-
         <Button
           variant="outline"
           colorScheme="red"
           onClick={() => {
-            setOutput("");
-            setInput("");
-            setIsError(false);
+            setTerminal([]);
+            setCurrentInput("");
+            setInputs([]);
           }}
         >
           Clear
         </Button>
 
-        <Button
-          variant="outline"
-          colorScheme="blue"
-          onClick={downloadCode}
-        >
+        <Button variant="outline" colorScheme="blue" onClick={downloadCode}>
           Download
         </Button>
       </Box>
 
-      {/* 🔹 OUTPUT BOX (PROPER HEIGHT) */}
+      {/* TERMINAL */}
       <Box
         flex="1"
-        minH="300px"                 // ✅ FIX HEIGHT
+        minH="300px"
         p={3}
         bg="black"
         color="green.400"
@@ -145,19 +136,38 @@ const Output = ({ editorRef, language }) => {
         borderRadius="6px"
         boxShadow="0 0 10px #00ffcc"
         overflowY="auto"
-        whiteSpace="pre-wrap"
       >
-        {isLoading
-          ? "⏳ Running..."
-          : output
-          ? output
-              .split("\n")
-              .map((line) => `> ${line}`)
-              .join("\n")
-          : '> Click "Run Code" to see output'}
+        {/* EMPTY */}
+        {terminal.length === 0 && "> Click Run to start"}
+
+        {/* OUTPUT */}
+        {terminal.map((line, i) => (
+          <div key={i}>{line}</div>
+        ))}
+
+        {/* INPUT */}
+        {waitingForInput && (
+          <input
+            style={{
+              background: "black",
+              color: "#00ffcc",
+              border: "none",
+              outline: "none",
+              width: "100%",
+              fontFamily: "monospace",
+            }}
+            value={currentInput}
+            onChange={(e) => setCurrentInput(e.target.value)}
+            onKeyDown={handleTerminalInput}
+            autoFocus
+          />
+        )}
+
+        {/* LOADING */}
+        {isLoading && <div>⏳ Running...</div>}
       </Box>
     </Box>
   );
-};
+});
 
 export default Output;

@@ -12,18 +12,29 @@ function App() {
       py={4}
       overflow="hidden"
     >
+      {/* 🔥 HEADER */}
       <Text
         fontSize="3xl"
-        mb={2}
+        mb={3}
         color="#00ffcc"
         fontWeight="bold"
-        textShadow="0 0 10px #00ffcc"
+        textShadow="0 0 12px #00ffcc"
+        letterSpacing="1px"
       >
         ⚡ Code Playground (Offline)
       </Text>
 
-      {/* 🔥 THIS IS CRITICAL */}
-      <Box flex="1" minH={0}>
+      {/* 🔥 MAIN CONTAINER */}
+      <Box
+        flex="1"
+        minH={0} // ✅ VERY IMPORTANT (prevents overflow bugs)
+        border="1px solid rgba(0,255,204,0.2)"
+        borderRadius="10px"
+        p={2}
+        boxShadow="0 0 20px rgba(0,255,204,0.1)"
+        bg="rgba(0,0,0,0.3)"
+        backdropFilter="blur(10px)"
+      >
         <CodeEditor />
       </Box>
     </Box>
