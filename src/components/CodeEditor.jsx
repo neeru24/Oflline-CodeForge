@@ -8,7 +8,10 @@ import Output from "./Output";
 const CodeEditor = () => {
   const editorRef = useRef();
   const outputRef = useRef();
+
   const intervalRef = useRef(null);
+  const replayIndexRef = useRef(0);
+  const replayCodeRef = useRef("");
 
   const [language, setLanguage] = useState("javascript");
   const [value, setValue] = useState("");
@@ -65,20 +68,67 @@ const CodeEditor = () => {
     setSavedFiles(updated);
   };
 
-  // 🔁 REPLAY (FIXED)
-  const replayCode = () => {
+  // ============================
+  // 🔁 REPLAY SYSTEM (FINAL FIX)
+  // ============================
+
+  const startReplay = () => {
     const code = editorRef.current.getValue();
-    let i = 0;
+
+    replayCodeRef.current = code;
+    replayIndexRef.current = 0;
 
     clearInterval(intervalRef.current);
-    setValue("");
+
+    // clear editor
+    editorRef.current.setValue("");
 
     intervalRef.current = setInterval(() => {
-      setValue((prev) => prev + (code[i] || ""));
-      i++;
+      const nextChar = replayCodeRef.current[replayIndexRef.current];
 
-      if (i >= code.length) {
+      if (nextChar !== undefined) {
+        editorRef.current.executeEdits("", [
+          {
+            range: editorRef.current.getModel().getFullModelRange(),
+            text: editorRef.current.getValue() + nextChar,
+          },
+        ]);
+
+        replayIndexRef.current++;
+      }
+
+      if (replayIndexRef.current >= replayCodeRef.current.length) {
         clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }, 50 / speed);
+  };
+
+  const pauseReplay = () => {
+    clearInterval(intervalRef.current);
+    intervalRef.current = null;
+  };
+
+  const resumeReplay = () => {
+    if (intervalRef.current) return;
+
+    intervalRef.current = setInterval(() => {
+      const nextChar = replayCodeRef.current[replayIndexRef.current];
+
+      if (nextChar !== undefined) {
+        editorRef.current.executeEdits("", [
+          {
+            range: editorRef.current.getModel().getFullModelRange(),
+            text: editorRef.current.getValue() + nextChar,
+          },
+        ]);
+
+        replayIndexRef.current++;
+      }
+
+      if (replayIndexRef.current >= replayCodeRef.current.length) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
     }, 50 / speed);
   };
@@ -105,7 +155,7 @@ const CodeEditor = () => {
     reader.readAsText(file);
   };
 
-  // 🔥 EXPORT (clean)
+  // 🔥 EXPORT FILE
   const exportFile = () => {
     const code = editorRef.current.getValue();
 
@@ -131,7 +181,6 @@ const CodeEditor = () => {
 
   return (
     <HStack spacing={4} h="100%" align="stretch">
-
       {/* LEFT */}
       <Box
         flex="2"
@@ -158,19 +207,15 @@ const CodeEditor = () => {
             ⬇ Export
           </Button>
 
-          <Button size="sm" colorScheme="yellow" onClick={replayCode}>
+          <Button size="sm" colorScheme="yellow" onClick={startReplay}>
             🔁 Replay
           </Button>
 
-          <Button
-            size="sm"
-            colorScheme="orange"
-            onClick={() => clearInterval(intervalRef.current)}
-          >
+          <Button size="sm" colorScheme="orange" onClick={pauseReplay}>
             ⏸ Pause
           </Button>
 
-          <Button size="sm" colorScheme="green" onClick={replayCode}>
+          <Button size="sm" colorScheme="green" onClick={resumeReplay}>
             ▶ Resume
           </Button>
 
@@ -239,7 +284,6 @@ const CodeEditor = () => {
 
       {/* RIGHT */}
       <Box flex="1" display="flex" flexDirection="column" gap={4}>
-
         {/* SAVED FILES */}
         <Box
           p={3}
@@ -262,7 +306,11 @@ const CodeEditor = () => {
                   {file.name} ({file.language})
                 </Text>
 
-                <Button size="xs" colorScheme="red" onClick={() => deleteFile(index)}>
+                <Button
+                  size="xs"
+                  colorScheme="red"
+                  onClick={() => deleteFile(index)}
+                >
                   X
                 </Button>
               </HStack>
@@ -273,7 +321,6 @@ const CodeEditor = () => {
         {/* OUTPUT */}
         <Output ref={outputRef} editorRef={editorRef} language={language} />
       </Box>
-
     </HStack>
   );
 };

@@ -10,34 +10,32 @@ export const runJavaScript = (code, input = "") => {
 
     const originalLog = console.log;
 
-    // 🔥 capture console.log
+    // capture console.log
     console.log = (...args) => {
       output.push(args.join(" "));
     };
 
-    // 🔥 fake prompt
+    // fake prompt
     const prompt = (msg = "") => {
       const value = inputs[inputIndex++] || "";
 
       if (msg) output.push(`> ${msg}`);
-      output.push(`> ${value}`);
+      if (value) output.push(`> ${value}`);
 
       return value;
     };
 
-    // execute code
+    // execute user code
     new Function("prompt", code)(prompt);
 
-    // restore console
     console.log = originalLog;
 
-    return output.length
-      ? output.join("\n")
-      : "✅ Code executed successfully!";
+    return output.join("\n"); // ✅ clean output (no extra message)
   } catch (error) {
     return "❌ Error: " + error.message;
   }
 };
+
 
 // ==========================================
 // 🐍 Python Execution (Pyodide + Input)
@@ -63,12 +61,16 @@ export const runPython = async (code, input = "") => {
   try {
     const py = await loadPyodideInstance();
 
-    // 🔥 escape input safely
-    const safeInput = input.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    const safeInput = input
+      .replace(/\\/g, "\\\\")
+      .replace(/"/g, '\\"');
 
+    // 🔥 RESET ENVIRONMENT EVERY RUN
     py.runPython(`
 import sys
 from io import StringIO
+
+sys.stdout = StringIO()
 
 input_data = """${safeInput}""".split("\\n")
 input_index = 0
@@ -80,18 +82,18 @@ def input(prompt=""):
         input_index += 1
         if prompt:
             print("> " + prompt)
-        print("> " + value)
+        if value:
+            print("> " + value)
         return value
     return ""
+`);
 
-sys.stdout = StringIO()
-    `);
-
+    // run user code
     py.runPython(code);
 
     let output = py.runPython("sys.stdout.getvalue()");
 
-    return output || "✅ Code executed successfully!";
+    return output.trim();
   } catch (error) {
     return "❌ Error: " + error.message;
   }
