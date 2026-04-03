@@ -1,13 +1,11 @@
 // ==========================================
 // 🔥 JavaScript Execution (Offline + Input)
 // ==========================================
-export const runJavaScript = (code, input = "") => {
+export const runJavaScript = (code, inputs = []) => {
   let output = [];
+  let inputIndex = 0;
 
   try {
-    let inputs = input.split("\n");
-    let inputIndex = 0;
-
     const originalLog = console.log;
 
     // capture console.log
@@ -18,19 +16,18 @@ export const runJavaScript = (code, input = "") => {
     // fake prompt
     const prompt = (msg = "") => {
       const value = inputs[inputIndex++] || "";
-
-      if (msg) output.push(`> ${msg}`);
-      if (value) output.push(`> ${value}`);
-
       return value;
     };
 
-    // execute user code
-    new Function("prompt", code)(prompt);
+    // execute user code safely
+    new Function("console", "prompt", code)(
+      { log: console.log },
+      prompt
+    );
 
     console.log = originalLog;
 
-    return output.join("\n"); // ✅ clean output (no extra message)
+    return output.join("\n") || "> (no output)";
   } catch (error) {
     return "❌ Error: " + error.message;
   }
@@ -43,6 +40,7 @@ export const runJavaScript = (code, input = "") => {
 
 let pyodide = null;
 
+// load Pyodide only once
 export const loadPyodideInstance = async () => {
   if (pyodide) return pyodide;
 
@@ -57,44 +55,44 @@ export const loadPyodideInstance = async () => {
   return pyodide;
 };
 
-export const runPython = async (code, input = "") => {
-  try {
-    const py = await loadPyodideInstance();
 
-    const safeInput = input
-      .replace(/\\/g, "\\\\")
-      .replace(/"/g, '\\"');
 
-    // 🔥 RESET ENVIRONMENT EVERY RUN
-    py.runPython(`
-import sys
-from io import StringIO
+    export const runPython = async (code, input = []) => {
+      try {
+        const py = await loadPyodideInstance();
 
-sys.stdout = StringIO()
+        const safeInput = input.join("\n");
 
-input_data = """${safeInput}""".split("\\n")
-input_index = 0
+        py.runPython(`
+    import sys
+    from io import StringIO
 
-def input(prompt=""):
-    global input_index
-    if input_index < len(input_data):
-        value = input_data[input_index]
-        input_index += 1
-        if prompt:
-            print("> " + prompt)
-        if value:
-            print("> " + value)
-        return value
-    return ""
-`);
+    sys.stdout = StringIO()
 
-    // run user code
-    py.runPython(code);
+    input_data = """${safeInput}""".split("\\n")
+    input_index = 0
 
-    let output = py.runPython("sys.stdout.getvalue()");
+    def input(prompt=""):
+        global input_index
+        if input_index < len(input_data):
+            value = input_data[input_index]
+            input_index += 1
+            return value
+        return ""
+    `);
 
-    return output.trim();
-  } catch (error) {
-    return "❌ Error: " + error.message;
-  }
-};
+        // ✅ THIS IS THE FIX
+        try {
+          py.runPython(code);
+        } catch (err) {
+          const cleanError = err.message.split("\n").slice(-1)[0];
+          return "❌ Error: " + cleanError;
+        }
+
+        let output = py.runPython("sys.stdout.getvalue()");
+        return output.trim();
+
+      } catch (error) {
+        return "❌ Error: " + error.message;
+      }
+    };
