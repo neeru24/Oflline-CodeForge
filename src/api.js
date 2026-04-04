@@ -1,98 +1,84 @@
-// ==========================================
-// 🔥 JavaScript Execution (Offline + Input)
-// ==========================================
 export const runJavaScript = (code, inputs = []) => {
-  let output = [];
+  const output = [];
   let inputIndex = 0;
+  const originalLog = console.log;
 
   try {
-    const originalLog = console.log;
-
-    // capture console.log
     console.log = (...args) => {
       output.push(args.join(" "));
     };
 
-    // fake prompt
-    const prompt = (msg = "") => {
-      const value = inputs[inputIndex++] || "";
-      return value;
+    const prompt = () => {
+      const value = inputs[inputIndex];
+      inputIndex += 1;
+      return value ?? "";
     };
 
-    // execute user code safely
-    new Function("console", "prompt", code)(
-      { log: console.log },
-      prompt
-    );
-
-    console.log = originalLog;
-
+    new Function("console", "prompt", code)({ log: console.log }, prompt);
     return output.join("\n") || "> (no output)";
   } catch (error) {
     return "❌ Error: " + error.message;
+  } finally {
+    console.log = originalLog;
   }
 };
 
-
-// ==========================================
-// 🐍 Python Execution (Pyodide + Input)
-// ==========================================
-
 let pyodide = null;
 
-// load Pyodide only once
 export const loadPyodideInstance = async () => {
   if (pyodide) return pyodide;
 
   if (!window.loadPyodide) {
-    throw new Error("Pyodide not loaded. Check index.html");
+    throw new Error("Pyodide loader missing. Ensure /pyodide/pyodide.js is available.");
   }
 
   pyodide = await window.loadPyodide({
-    indexURL: "https://cdn.jsdelivr.net/pyodide/v0.23.4/full/",
+    indexURL: "/pyodide/",
   });
 
   return pyodide;
 };
 
+export const runPython = async (code, input = []) => {
+  try {
+    const py = await loadPyodideInstance();
+    const inputValues = Array.isArray(input) ? input : [];
 
+    py.globals.set("__js_input_values", inputValues);
 
-    export const runPython = async (code, input = []) => {
-      try {
-        const py = await loadPyodideInstance();
+    py.runPython(`
+import sys
+from io import StringIO
 
-        const safeInput = input.join("\n");
+sys.stdout = StringIO()
+sys.stderr = StringIO()
 
-        py.runPython(`
-    import sys
-    from io import StringIO
+input_data = [str(v) for v in __js_input_values]
+input_index = 0
 
-    sys.stdout = StringIO()
+def input(prompt=""):
+    global input_index
+    if input_index < len(input_data):
+        value = input_data[input_index]
+        input_index += 1
+        return value
+    return ""
+`);
 
-    input_data = """${safeInput}""".split("\\n")
-    input_index = 0
+    try {
+      py.runPython(code);
+    } catch (err) {
+      const cleanError = err.message.split("\n").slice(-1)[0];
+      return "❌ Error: " + cleanError;
+    } finally {
+      py.globals.delete("__js_input_values");
+    }
 
-    def input(prompt=""):
-        global input_index
-        if input_index < len(input_data):
-            value = input_data[input_index]
-            input_index += 1
-            return value
-        return ""
-    `);
-
-        // ✅ THIS IS THE FIX
-        try {
-          py.runPython(code);
-        } catch (err) {
-          const cleanError = err.message.split("\n").slice(-1)[0];
-          return "❌ Error: " + cleanError;
-        }
-
-        let output = py.runPython("sys.stdout.getvalue()");
-        return output.trim();
-
-      } catch (error) {
-        return "❌ Error: " + error.message;
-      }
-    };
+    const stdout = py.runPython("sys.stdout.getvalue()");
+    const stderr = py.runPython("sys.stderr.getvalue()");
+    const combined = [stdout, stderr].filter(Boolean).join("\n").trim();
+    return combined || "> (no output)";
+  } catch (error) {
+    return "❌ Error: " + error.message;
+  }
+};
