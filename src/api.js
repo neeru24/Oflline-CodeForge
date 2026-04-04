@@ -1,29 +1,87 @@
 export const runJavaScript = (code, inputs = []) => {
+  const workerSource = `
+self.onmessage = (event) => {
+  const { code, inputs } = event.data;
   const output = [];
   let inputIndex = 0;
-  const originalLog = console.log;
+
+  const emit = (...args) => {
+    output.push(args.map((arg) => String(arg)).join(" "));
+  };
+
+  const consoleProxy = {
+    log: (...args) => emit(...args),
+    info: (...args) => emit(...args),
+    warn: (...args) => emit(...args),
+    error: (...args) => emit(...args),
+  };
+
+  const prompt = () => {
+    const value = inputs[inputIndex];
+    inputIndex += 1;
+    return value ?? "";
+  };
 
   try {
-    console.log = (...args) => {
-      output.push(args.join(" "));
-    };
-
-    const prompt = () => {
-      const value = inputs[inputIndex];
-      inputIndex += 1;
-      return value ?? "";
-    };
-
-    new Function("console", "prompt", code)({ log: console.log }, prompt);
-    return output.join("\n") || "> (no output)";
+    const runner = new Function("console", "prompt", code);
+    runner(consoleProxy, prompt);
+    self.postMessage({ ok: true, output: output.join("\\n") || "> (no output)" });
   } catch (error) {
-    return "❌ Error: " + error.message;
-  } finally {
-    console.log = originalLog;
+    self.postMessage({ ok: false, error: String(error?.message || error) });
   }
+};
+`;
+
+  return new Promise((resolve) => {
+    const workerBlob = new Blob([workerSource], { type: "application/javascript" });
+    const workerUrl = URL.createObjectURL(workerBlob);
+    const worker = new Worker(workerUrl);
+
+    const cleanup = () => {
+      worker.terminate();
+      URL.revokeObjectURL(workerUrl);
+    };
+
+    const timeoutId = window.setTimeout(() => {
+      cleanup();
+      resolve("❌ Error: JavaScript execution timed out.");
+    }, 4000);
+
+    worker.onmessage = (event) => {
+      clearTimeout(timeoutId);
+      cleanup();
+
+      if (event.data?.ok) {
+        resolve(event.data.output);
+        return;
+      }
+
+      resolve("❌ Error: " + (event.data?.error || "JavaScript execution failed."));
+    };
+
+    worker.onerror = () => {
+      clearTimeout(timeoutId);
+      cleanup();
+      resolve("❌ Error: JavaScript worker crashed.");
+    };
+
+    worker.postMessage({ code, inputs: Array.isArray(inputs) ? inputs : [] });
+  });
 };
 
 let pyodide = null;
+
+const formatExecutionError = (error) => {
+  const raw = String(error?.message ?? error ?? "").trim();
+  if (!raw) return "Unknown execution error.";
+
+  const lines = raw
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  return lines[lines.length - 1] || raw;
+};
 
 export const loadPyodideInstance = async () => {
   if (pyodide) return pyodide;
@@ -68,8 +126,7 @@ def input(prompt=""):
     try {
       py.runPython(code);
     } catch (err) {
-      const cleanError = err.message.split("\n").slice(-1)[0];
-      return "❌ Error: " + cleanError;
+      return "❌ Error: " + formatExecutionError(err);
     } finally {
       py.globals.delete("__js_input_values");
     }
@@ -79,6 +136,6 @@ def input(prompt=""):
     const combined = [stdout, stderr].filter(Boolean).join("\n").trim();
     return combined || "> (no output)";
   } catch (error) {
-    return "❌ Error: " + error.message;
+    return "❌ Error: " + formatExecutionError(error);
   }
 };

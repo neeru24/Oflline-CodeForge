@@ -139,6 +139,40 @@ const removeNodeFromTree = (nodes, targetId) => {
     });
 };
 
+const moveNodeInSiblings = (siblings, targetId, direction) => {
+  const index = siblings.findIndex((node) => node.id === targetId);
+  if (index === -1) return siblings;
+
+  const targetIndex = direction === "up" ? index - 1 : index + 1;
+  if (targetIndex < 0 || targetIndex >= siblings.length) return siblings;
+
+  const next = [...siblings];
+  [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+  return next;
+};
+
+const moveNodeInTree = (nodes, targetId, direction) => {
+  const inRoot = nodes.some((node) => node.id === targetId);
+  if (inRoot) return moveNodeInSiblings(nodes, targetId, direction);
+
+  return nodes.map((node) => {
+    if (node.type !== "folder") return node;
+
+    const children = node.children || [];
+    if (children.some((child) => child.id === targetId)) {
+      return {
+        ...node,
+        children: moveNodeInSiblings(children, targetId, direction),
+      };
+    }
+
+    return {
+      ...node,
+      children: moveNodeInTree(children, targetId, direction),
+    };
+  });
+};
+
 const collectFiles = (nodes) => {
   const files = [];
   const walk = (list) => {
@@ -151,7 +185,14 @@ const collectFiles = (nodes) => {
   return files;
 };
 
-function TreeNode({ node, level, selectedId, onSelect, onDelete }) {
+const countExpectedInputs = (code, language) => {
+  if (!code) return 0;
+  const regex = language === "javascript" ? /\bprompt\s*\(/g : /\binput\s*\(/g;
+  const matches = code.match(regex);
+  return matches ? matches.length : 0;
+};
+
+function TreeNode({ node, level, selectedId, onSelect, onDelete, onRename, onMove }) {
   const isSelected = node.id === selectedId;
   if (node.type === "folder") {
     return (
@@ -170,6 +211,15 @@ function TreeNode({ node, level, selectedId, onSelect, onDelete }) {
           <Button size="xs" colorScheme="red" variant="ghost" onClick={() => onDelete(node.id)}>
             🗑
           </Button>
+          <Button size="xs" colorScheme="yellow" variant="ghost" onClick={() => onRename(node.id)}>
+            ✏
+          </Button>
+          <Button size="xs" variant="ghost" onClick={() => onMove(node.id, "up")}>
+            ⬆
+          </Button>
+          <Button size="xs" variant="ghost" onClick={() => onMove(node.id, "down")}>
+            ⬇
+          </Button>
         </HStack>
         <VStack align="stretch" spacing={1} mt={1}>
           {(node.children || []).map((child) => (
@@ -180,6 +230,8 @@ function TreeNode({ node, level, selectedId, onSelect, onDelete }) {
               selectedId={selectedId}
               onSelect={onSelect}
               onDelete={onDelete}
+              onRename={onRename}
+              onMove={onMove}
             />
           ))}
         </VStack>
@@ -202,6 +254,15 @@ function TreeNode({ node, level, selectedId, onSelect, onDelete }) {
       <Button size="xs" colorScheme="red" variant="ghost" onClick={() => onDelete(node.id)}>
         🗑
       </Button>
+      <Button size="xs" colorScheme="yellow" variant="ghost" onClick={() => onRename(node.id)}>
+        ✏
+      </Button>
+      <Button size="xs" variant="ghost" onClick={() => onMove(node.id, "up")}>
+        ⬆
+      </Button>
+      <Button size="xs" variant="ghost" onClick={() => onMove(node.id, "down")}>
+        ⬇
+      </Button>
     </HStack>
   );
 }
@@ -213,6 +274,7 @@ const MultiLanguageWorkspace = () => {
   const [openTabs, setOpenTabs] = useState([]);
   const [activeFileId, setActiveFileId] = useState(null);
   const [newName, setNewName] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [newType, setNewType] = useState("file");
   const [runOutput, setRunOutput] = useState("Ready");
   const [runInput, setRunInput] = useState("");
@@ -223,8 +285,39 @@ const MultiLanguageWorkspace = () => {
   const [isExplorerDragOver, setIsExplorerDragOver] = useState(false);
 
   const allFiles = useMemo(() => collectFiles(tree), [tree]);
+  const filteredFiles = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return [];
+    return allFiles.filter((file) => file.name.toLowerCase().includes(query)).slice(0, 10);
+  }, [allFiles, searchQuery]);
   const activeFile = useMemo(() => findNodeById(tree, activeFileId), [tree, activeFileId]);
   const selectedNode = useMemo(() => findNodeById(tree, selectedNodeId), [tree, selectedNodeId]);
+  const expectedInputCount = useMemo(() => {
+    if (!activeFile || activeFile.type !== "file") return 0;
+    if (activeFile.language !== "python" && activeFile.language !== "javascript") return 0;
+    return countExpectedInputs(activeFile.content || "", activeFile.language);
+  }, [activeFile]);
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.ctrlKey && event.key.toLowerCase() === "p") {
+        event.preventDefault();
+        const quickName = window.prompt("Go to file (contains):", "");
+        if (!quickName || !quickName.trim()) return;
+
+        const matched = allFiles.find((file) =>
+          file.name.toLowerCase().includes(quickName.trim().toLowerCase())
+        );
+        if (!matched) return;
+
+        setSelectedNodeId(matched.id);
+        ensureFileOpen(matched);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [allFiles]);
 
   useEffect(() => {
     try {
@@ -338,6 +431,29 @@ const MultiLanguageWorkspace = () => {
     setOpenTabs((prev) => prev.filter((id) => !idsToRemove.includes(id)));
     setSelectedNodeId((prev) => (prev && idsToRemove.includes(prev) ? null : prev));
     setActiveFileId((prev) => (prev && idsToRemove.includes(prev) ? null : prev));
+  };
+
+  const renameNode = (nodeId) => {
+    const node = findNodeById(tree, nodeId);
+    if (!node) return;
+
+    const nextName = window.prompt("Rename item", node.name);
+    if (!nextName || !nextName.trim()) return;
+
+    setTree((prev) =>
+      updateNodeInTree(prev, nodeId, (item) => {
+        const updatedName = nextName.trim();
+        return {
+          ...item,
+          name: updatedName,
+          ...(item.type === "file" ? { language: inferLanguage(updatedName) } : {}),
+        };
+      })
+    );
+  };
+
+  const moveNode = (nodeId, direction) => {
+    setTree((prev) => moveNodeInTree(prev, nodeId, direction));
   };
 
   const createId = (prefix, name) =>
@@ -566,14 +682,23 @@ const MultiLanguageWorkspace = () => {
 
   const runActiveFile = async () => {
     if (!activeFile || activeFile.type !== "file") return;
-    setIsRunning(true);
     const inputLines = runInput
       .split("\n")
-      .map((line) => line.replace(/\r/g, ""));
+      .map((line) => line.replace(/\r/g, ""))
+      .filter((line) => line.trim() !== "");
+
+    if (expectedInputCount > 0 && inputLines.length < expectedInputCount) {
+      setRunOutput(
+        `Input required: expected at least ${expectedInputCount} value${expectedInputCount === 1 ? "" : "s"}, got ${inputLines.length}.`
+      );
+      return;
+    }
+
+    setIsRunning(true);
 
     try {
       if (activeFile.language === "javascript") {
-        const out = runJavaScript(activeFile.content || "", inputLines);
+        const out = await runJavaScript(activeFile.content || "", inputLines);
         setRunOutput(out || "(no output)");
       } else if (activeFile.language === "python") {
         const out = await runPython(activeFile.content || "", inputLines);
@@ -630,6 +755,34 @@ const MultiLanguageWorkspace = () => {
           mb={2}
         />
 
+        <Input
+          size="sm"
+          placeholder="Search files... (Ctrl+P)"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          mb={2}
+        />
+
+        {filteredFiles.length > 0 && (
+          <VStack align="stretch" spacing={1} mb={2}>
+            {filteredFiles.map((file) => (
+              <Button
+                key={file.id}
+                size="xs"
+                variant="ghost"
+                justifyContent="flex-start"
+                onClick={() => {
+                  setSelectedNodeId(file.id);
+                  ensureFileOpen(file);
+                  setSearchQuery("");
+                }}
+              >
+                🔎 {file.name}
+              </Button>
+            ))}
+          </VStack>
+        )}
+
         <HStack mb={3} spacing={2}>
           <Button size="xs" colorScheme="purple" onClick={() => importFilesInputRef.current?.click()}>
             Import Files
@@ -671,6 +824,8 @@ const MultiLanguageWorkspace = () => {
               selectedId={selectedNodeId}
               onSelect={handleSelectNode}
               onDelete={deleteNode}
+              onRename={renameNode}
+              onMove={moveNode}
             />
           ))}
         </VStack>
@@ -747,6 +902,9 @@ const MultiLanguageWorkspace = () => {
           >
             <Text fontWeight="bold" color="#00ffcc" mb={2}>
               ⌨ Input (one line per input())
+            </Text>
+            <Text color="gray.400" fontSize="xs" mb={2}>
+              Detected inputs in active file: {expectedInputCount}
             </Text>
             <Textarea
               mb={3}

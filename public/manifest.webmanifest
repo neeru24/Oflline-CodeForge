@@ -1,0 +1,16 @@
+{
+  "name": "Offline CodeForge",
+  "short_name": "CodeForge",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f0a19",
+  "theme_color": "#0f0a19",
+  "description": "Offline-first JavaScript and Python code playground with workspace mode.",
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

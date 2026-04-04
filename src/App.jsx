@@ -1,5 +1,5 @@
-import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
-import { Suspense, lazy, useState } from "react";
+import { Badge, Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { loadPyodideInstance } from "./api";
 
 const loadCodeEditor = () => import("./components/CodeEditor");
@@ -9,7 +9,7 @@ const CodeEditor = lazy(loadCodeEditor);
 const MultiLanguageWorkspace = lazy(loadMultiLanguageWorkspace);
 const LandingPage = lazy(() => import("./pages/LandingPage.jsx"));
 
-const OFFLINE_CACHE_KEY = "offline-runtime-v1";
+const OFFLINE_CACHE_KEY = "offline-runtime-v2";
 const PYODIDE_ASSETS = [
   "/pyodide/pyodide.js",
   "/pyodide/pyodide.asm.js",
@@ -23,6 +23,20 @@ function App() {
   const [mode, setMode] = useState("classic");
   const [hasPreloadedFirstMode, setHasPreloadedFirstMode] = useState(false);
   const [isPreparingOffline, setIsPreparingOffline] = useState(false);
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+
+  useEffect(() => {
+    const markOnline = () => setIsOnline(true);
+    const markOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", markOnline);
+    window.addEventListener("offline", markOffline);
+
+    return () => {
+      window.removeEventListener("online", markOnline);
+      window.removeEventListener("offline", markOffline);
+    };
+  }, []);
 
   const warmupOfflineCache = async () => {
     if (typeof window === "undefined" || !("caches" in window)) return;
@@ -135,6 +149,10 @@ function App() {
       >
         ⚡ Code Playground (Offline)
       </Text>
+
+      <Badge alignSelf="flex-start" mb={3} colorScheme={isOnline ? "green" : "orange"}>
+        {isOnline ? "Online" : "Offline"}
+      </Badge>
 
       <HStack mb={3} spacing={2}>
         <Button

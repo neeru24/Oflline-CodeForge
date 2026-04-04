@@ -38,19 +38,9 @@ const Output = forwardRef(({ editorRef, language }, ref) => {
   };
 
   const extractPrompts = (code) => {
-    const regex =
-      language === "javascript"
-        ? /prompt\(["'`](.*?)["'`]\)/g
-        : /input\(["'`](.*?)["'`]\)/g;
-
-    let matches = [];
-    let match;
-
-    while ((match = regex.exec(code)) !== null) {
-      matches.push(match[1] || "Input:");
-    }
-
-    return matches;
+    const regex = language === "javascript" ? /\bprompt\s*\(/g : /\binput\s*\(/g;
+    const matches = code.match(regex);
+    return matches ? matches.length : 0;
   };
 
   const executeCode = async (userInputs) => {
@@ -59,7 +49,7 @@ const Output = forwardRef(({ editorRef, language }, ref) => {
     try {
       let result =
         language === "javascript"
-          ? runJavaScript(code, userInputs)
+          ? await runJavaScript(code, userInputs)
           : await runPython(code, userInputs);
 
       appendLine("");
@@ -80,13 +70,13 @@ const Output = forwardRef(({ editorRef, language }, ref) => {
       setCurrentInput("");
 
       const code = editorRef.current.getValue();
-      const prompts = extractPrompts(code);
-      setExpectedInputs(prompts.length);
+      const promptCount = extractPrompts(code);
+      setExpectedInputs(promptCount);
 
-      if (prompts.length > 0) {
+      if (promptCount > 0) {
         setWaitingForInput(true);
-
-        appendLine("> Provide input:");
+        appendLine(`> Provide ${promptCount} input value${promptCount === 1 ? "" : "s"} and press Enter.`);
+        appendLine('> For loop/dynamic input programs, enter values then type "/run".');
 
         return;
       }
@@ -105,24 +95,21 @@ const Output = forwardRef(({ editorRef, language }, ref) => {
       return;
     }
 
+    if (currentInput === "/run") {
+      setWaitingForInput(false);
+      setIsRunning(true);
+      await executeCode(inputs);
+      setInputs([]);
+      setCurrentInput("");
+      return;
+    }
+
     appendLine("> " + currentInput);
     const newInputs = [...inputs, currentInput];
     setInputs(newInputs);
     setCurrentInput("");
-    // 🔥 detect loop case
-    const n = parseInt(newInputs[0]);
 
-    // if only 1 prompt → simple case
-    if (expectedInputs === 1) {
-      setWaitingForInput(false);
-      setIsRunning(true);
-      await executeCode(newInputs);
-      setInputs([]);
-      return;
-    }
-
-    // 🔥 loop case (n + inputs)
-    if (!isNaN(n) && newInputs.length === n + 1) {
+    if (newInputs.length >= expectedInputs) {
       setWaitingForInput(false);
       setIsRunning(true);
 
