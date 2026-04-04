@@ -10,6 +10,7 @@ import { runJavaScript, runPython } from "../api";
 
 const Output = forwardRef(({ editorRef, language }, ref) => {
   const [terminal, setTerminal] = useState([]);
+  const [previewDoc, setPreviewDoc] = useState("");
   const [currentInput, setCurrentInput] = useState("");
   const [inputs, setInputs] = useState([]);
   const [waitingForInput, setWaitingForInput] = useState(false);
@@ -43,10 +44,50 @@ const Output = forwardRef(({ editorRef, language }, ref) => {
     return matches ? matches.length : 0;
   };
 
+  const buildHtmlPreview = (code) => {
+    if (/<html[\s>]/i.test(code) || /<!doctype html>/i.test(code)) {
+      return code;
+    }
+
+    return `<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <style>${code}</style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Preview</h1>
+      <p>Your CSS is applied to this sample card.</p>
+    </div>
+  </body>
+</html>`;
+  };
+
+  const renderPreview = (code) => {
+    if (language === "html") {
+      setPreviewDoc(buildHtmlPreview(code));
+      appendLine("> HTML preview updated.");
+      return;
+    }
+
+    if (language === "css") {
+      setPreviewDoc(buildHtmlPreview(code));
+      appendLine("> CSS preview updated.");
+      return;
+    }
+  };
+
   const executeCode = async (userInputs) => {
     const code = editorRef.current.getValue();
 
     try {
+      if (language === "html" || language === "css") {
+        renderPreview(code);
+        setIsRunning(false);
+        return;
+      }
+
       let result =
         language === "javascript"
           ? await runJavaScript(code, userInputs)
@@ -68,9 +109,10 @@ const Output = forwardRef(({ editorRef, language }, ref) => {
       setTerminal([]);
       setInputs([]);
       setCurrentInput("");
+      setPreviewDoc("");
 
       const code = editorRef.current.getValue();
-      const promptCount = extractPrompts(code);
+      const promptCount = language === "javascript" || language === "python" ? extractPrompts(code) : 0;
       setExpectedInputs(promptCount);
 
       if (promptCount > 0) {
@@ -162,6 +204,17 @@ const Output = forwardRef(({ editorRef, language }, ref) => {
                 flex: 1,
               }}
             />
+              {(language === "html" || language === "css") && (
+                <Box mb={3} border="1px solid rgba(0,255,204,0.25)" borderRadius="8px" overflow="hidden" bg="white">
+                  <iframe
+                    title="classic-preview"
+                    srcDoc={previewDoc || buildHtmlPreview(editorRef.current?.getValue?.() || "")}
+                    style={{ width: "100%", height: "220px", border: "none" }}
+                    sandbox="allow-scripts"
+                  />
+                </Box>
+              )}
+
           </Box>
         )}
       </Box>

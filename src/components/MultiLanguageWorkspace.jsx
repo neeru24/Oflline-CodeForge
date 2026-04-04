@@ -1000,13 +1000,13 @@ const MultiLanguageWorkspace = () => {
               ⌨ Input (one line per input())
             </Text>
             <Text color="gray.400" fontSize="xs" mb={2}>
-              Detected inputs in active file: {expectedInputCount}
+              One value per line.
             </Text>
             <Textarea
               mb={3}
               value={runInput}
               onChange={(e) => setRunInput(e.target.value)}
-              placeholder={"example:\npranav\n20"}
+              placeholder={"Enter input values here, one per line"}
               size="sm"
               minH="84px"
             />
