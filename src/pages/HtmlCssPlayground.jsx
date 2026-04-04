@@ -27,6 +27,7 @@ import {
   Tooltip,
   Progress,
   SimpleGrid,
+  Switch,
 } from "@chakra-ui/react";
 import { 
   MoonIcon, 
@@ -159,7 +160,31 @@ button:hover {
   const [replaySpeed, setReplaySpeed] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [replayStep, setReplayStep] = useState(0);
+  const [autoPreview, setAutoPreview] = useState(true);
   const intervalRef = useRef(null);
+  const previewDebounceRef = useRef(null);
+
+  const buildPreviewDocument = (html, css) => {
+    const hasDoctype = /<!doctype html>/i.test(html);
+    const hasHtmlTag = /<html[\s>]/i.test(html);
+
+    if (hasDoctype || hasHtmlTag) {
+      if (/<\/head>/i.test(html)) {
+        return html.replace(/<\/head>/i, `<style>${css}</style></head>`);
+      }
+      return html.replace(/<body[^>]*>/i, `<head><style>${css}</style></head>$&`);
+    }
+
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <style>${css}</style>
+</head>
+<body>
+  ${html}
+</body>
+</html>`;
+  };
 
   // Sample templates
   const templates = {
@@ -271,7 +296,7 @@ button:hover {
 }
 @keyframes bounce {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-50px);
+  50% { transform: translateY(-50px); }
 }`
     },
     flexbox: {
@@ -339,23 +364,29 @@ button:hover {
     }
   };
 
-  // Update preview
+  // Update preview (debounced for smoother typing)
   useEffect(() => {
-    if (!isReplayMode) {
-      const fullHtml = htmlCode.includes('<!DOCTYPE html>') ? htmlCode : `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <style>${cssCode}</style>
-        </head>
-        <body>
-          ${htmlCode}
-        </body>
-        </html>
-      `;
-      setPreviewContent(fullHtml);
+    if (!autoPreview) {
+      if (previewDebounceRef.current) {
+        clearTimeout(previewDebounceRef.current);
+      }
+      return;
     }
-  }, [htmlCode, cssCode, isReplayMode]);
+
+    if (previewDebounceRef.current) {
+      clearTimeout(previewDebounceRef.current);
+    }
+
+    previewDebounceRef.current = setTimeout(() => {
+      setPreviewContent(buildPreviewDocument(htmlCode, cssCode));
+    }, 180);
+
+    return () => {
+      if (previewDebounceRef.current) {
+        clearTimeout(previewDebounceRef.current);
+      }
+    };
+  }, [htmlCode, cssCode, autoPreview]);
 
   // Replay mode logic
   useEffect(() => {
@@ -402,6 +433,10 @@ button:hover {
     setIsReplayMode(true);
     setIsPlaying(true);
     setReplayStep(0);
+  };
+
+  const refreshPreview = () => {
+    setPreviewContent(buildPreviewDocument(htmlCode, cssCode));
   };
 
   return (
@@ -551,9 +586,27 @@ button:hover {
             <VStack spacing={4} align="stretch" h="100%">
               <HStack justify="space-between">
                 <Heading size="sm">🖥️ Live Preview</Heading>
-                <Badge colorScheme="green" fontSize="xs">
-                  Instant Updates
-                </Badge>
+                <HStack spacing={3}>
+                  <HStack spacing={2}>
+                    <Switch
+                      size="sm"
+                      isChecked={autoPreview}
+                      onChange={(e) => setAutoPreview(e.target.checked)}
+                      colorScheme="green"
+                    />
+                    <Text fontSize="xs" color="gray.500">
+                      Auto Preview
+                    </Text>
+                  </HStack>
+                  {!autoPreview && (
+                    <Button size="xs" colorScheme="blue" onClick={refreshPreview}>
+                      Refresh
+                    </Button>
+                  )}
+                  <Badge colorScheme={autoPreview ? "green" : "yellow"} fontSize="xs">
+                    {autoPreview ? "Instant Updates" : "Manual Updates"}
+                  </Badge>
+                </HStack>
               </HStack>
 
               <Box
