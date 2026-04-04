@@ -157,6 +157,14 @@ function App() {
       <HStack mb={3} spacing={2}>
         <Button
           size="sm"
+          colorScheme="purple"
+          variant="outline"
+          onClick={() => setShowLanding(true)}
+        >
+          ← Back
+        </Button>
+        <Button
+          size="sm"
           colorScheme={mode === "classic" ? "teal" : "gray"}
           onClick={() => handleModeChange("classic")}
         >
