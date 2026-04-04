@@ -55,6 +55,19 @@ npm run dev
 npm run build
 npm run preview
 
+---
+
+## Screenshots
+
+### Landing Page - Both Light and Dark Theme 
+
+<img width="959" height="469" alt="image" src="https://github.com/user-attachments/assets/5ee7d97d-4e7e-4118-b26d-50f9e1ec569a" />
+<img width="873" height="414" alt="image" src="https://github.com/user-attachments/assets/9b99e0c1-1afd-490c-a80b-ed3ef0f8a7cc" />
+<img width="772" height="384" alt="image" src="https://github.com/user-attachments/assets/456d14e1-ec52-475f-976d-666bca9ba729" />
+<img width="883" height="395" alt="image" src="https://github.com/user-attachments/assets/1762b899-b384-4468-a619-c9bdc1cbfe4e" />
+
+
+
 ## Offline Flow
 
 1. Open the app while connected to the internet  
