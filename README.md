@@ -11,50 +11,6 @@ Offline-first browser-based code playground built with **React, Vite, Monaco Edi
 - Supports **terminal-style input simulation**  
 - No setup, no installation required  
 
-### Workspace Mode
-- Multi-file project support  
-- File explorer with:
-  - Create, rename, delete files and folders  
-  - Drag and drop support  
-  - Import files and folders  
-- Tab-based editing system  
-- Persistent storage using browser storage  
-
-### Python Runtime
-- Python runs directly in the browser using **Pyodide (WebAssembly)**  
-- No installation or environment setup required  
-- Runtime files served locally  
-
-### Offline Support
-- Works fully offline after initial load  
-- Uses service worker caching  
-- No backend or internet dependency  
-
-### PWA Support
-- Installable as a Progressive Web App  
-- App-like experience on desktop and mobile  
-
----
-
-## Tech Stack
-
-- React.js – Frontend framework  
-- Vite – Build tool  
-- Monaco Editor – Code editor  
-- Chakra UI – UI components  
-- Pyodide (WebAssembly) – Python execution  
-- Service Workers – Offline caching  
-
----
-
-## Run Locally
-npm install
-npm run dev
-
-## Production
-npm run build
-npm run preview
-
 ---
 
 ## 🔄 Execution Workflow
@@ -154,6 +110,53 @@ A --> P[PWA Install Option]
 %% End
 N --> Q[Continuous Learning Offline]
 ```
+
+---
+
+### Workspace Mode
+- Multi-file project support  
+- File explorer with:
+  - Create, rename, delete files and folders  
+  - Drag and drop support  
+  - Import files and folders  
+- Tab-based editing system  
+- Persistent storage using browser storage  
+
+### Python Runtime
+- Python runs directly in the browser using **Pyodide (WebAssembly)**  
+- No installation or environment setup required  
+- Runtime files served locally  
+
+### Offline Support
+- Works fully offline after initial load  
+- Uses service worker caching  
+- No backend or internet dependency  
+
+### PWA Support
+- Installable as a Progressive Web App  
+- App-like experience on desktop and mobile  
+
+---
+
+## Tech Stack
+
+- React.js – Frontend framework  
+- Vite – Build tool  
+- Monaco Editor – Code editor  
+- Chakra UI – UI components  
+- Pyodide (WebAssembly) – Python execution  
+- Service Workers – Offline caching  
+
+---
+
+## Run Locally
+npm install
+npm run dev
+
+## Production
+npm run build
+npm run preview
+
 
 ---
 
