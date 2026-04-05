@@ -57,6 +57,41 @@ npm run preview
 
 ---
 
+## 🔄 Execution Workflow
+
+```mermaid
+flowchart TD
+
+A[User Opens App] --> B{Select Mode}
+
+B -->|Classic Mode| C[Write Code in Monaco Editor]
+B -->|Workspace Mode| D[Manage Files & Folders]
+
+C --> E[Run Code]
+D --> E
+
+E --> F{Language Type}
+
+F -->|JS / HTML / CSS| G[Browser Engine Execution]
+F -->|Python| H[Pyodide WASM Runtime]
+
+G --> I[Sandboxed iframe Output]
+H --> I
+
+E --> K{Input Required?}
+K -->|Yes| L[Custom Input Simulation]
+L --> E
+K -->|No| I
+
+I --> J[Display Output]
+
+J --> M[Save to localStorage]
+
+M --> N[Offline Access via Service Worker]
+```
+
+---
+
 ## Screenshots
 
 ### Landing Page - Both Light and Dark Theme 
