@@ -92,6 +92,71 @@ M --> N[Offline Access via Service Worker]
 
 ---
 
+## ⚙️ Feature Workflow
+
+```mermaid
+flowchart TD
+
+A[User Opens App] --> B{Choose Mode}
+
+B -->|Classic Mode| C[Single File Editor]
+B -->|Workspace Mode| D[Multi File Workspace]
+
+%% Classic Mode Features
+C --> C1[Write Code]
+C1 --> C2[Run Code]
+C2 --> C3[Pause / Resume Execution]
+C2 --> C4[Provide Input]
+C2 --> C5[View Output]
+
+%% Workspace Features
+D --> D1[File Explorer]
+D1 --> D2[Create / Rename / Delete Files]
+D1 --> D3[Drag and Drop Files]
+D1 --> D4[Import Files / Folders]
+D --> D5[Tabs System]
+D --> D6[Run Project]
+
+%% Common Execution
+C2 --> E[Execution Engine]
+D6 --> E
+
+E --> F{Language}
+
+F -->|JS / HTML / CSS| G[Browser Runtime]
+F -->|Python| H[Pyodide Runtime]
+
+G --> I[Render Output]
+H --> I
+
+%% Advanced Features
+I --> J[Code Replay Engine]
+J --> J1[Record Execution]
+J --> J2[Replay Step by Step]
+J --> J3[Pause / Resume Replay]
+J --> J4[Speed Control]
+
+I --> K[Explain UI Mode]
+K --> K1[Map DOM Elements]
+K --> K2[Show Applied CSS]
+
+I --> L[Before After Comparison]
+L --> L1[Render Before State]
+L --> L2[Render After State]
+
+%% Storage + Offline
+I --> M[Save to localStorage]
+M --> N[Offline Access]
+
+%% PWA
+A --> P[PWA Install Option]
+
+%% End
+N --> Q[Continuous Learning Offline]
+```
+
+---
+
 ## Screenshots
 
 ### Landing Page - Both Light and Dark Theme 
