@@ -66,6 +66,19 @@ npm run preview
 <img width="772" height="384" alt="image" src="https://github.com/user-attachments/assets/456d14e1-ec52-475f-976d-666bca9ba729" />
 <img width="883" height="395" alt="image" src="https://github.com/user-attachments/assets/1762b899-b384-4468-a619-c9bdc1cbfe4e" />
 
+---
+
+## MAIN EDITOR 
+<img width="959" height="467" alt="image" src="https://github.com/user-attachments/assets/c92c10d7-41ed-4e9f-91e5-ba6b7c965f4f" />
+<img width="959" height="469" alt="image" src="https://github.com/user-attachments/assets/88e3512f-45e8-483f-8e6d-923fd08b4835" />
+
+---
+
+## HTML/CSS PLAYGROUND
+<img width="860" height="419" alt="image" src="https://github.com/user-attachments/assets/d55612d9-bca3-41cc-b4b0-0e50da900d4e" />
+<img width="855" height="423" alt="image" src="https://github.com/user-attachments/assets/7963047f-d82e-4a2b-b28f-74d3ff57a7c4" />
+<img width="790" height="430" alt="image" src="https://github.com/user-attachments/assets/7098be97-a644-46ef-841b-671c83a41e5e" />
+
 
 
 ## Offline Flow
